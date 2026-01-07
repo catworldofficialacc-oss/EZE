@@ -1,6 +1,6 @@
 #!/bin/bash
-# eze0.2.0 — Ez installer/updater
-# Supports: Ez core + Keys + Musical + Audio
+# eze0.2.1 — Ez installer/updater with reliable self-update
+# Supports: EzCore, Keys, Musical, Audio
 # Downloads with slow line-by-line effect
 
 # -------------------------------
@@ -29,7 +29,7 @@ slow_download() {
 
     temp=$(mktemp)
     if command -v curl &> /dev/null; then
-        curl -s -o "$temp" "$url"
+        curl -s -L -o "$temp" "$url"
     elif command -v wget &> /dev/null; then
         wget -q -O "$temp" "$url"
     else
@@ -50,30 +50,43 @@ slow_download() {
 }
 
 # -------------------------------
+# Self-update handling for eze1
+# -------------------------------
+if [[ "$(basename "$0")" == "eze1" ]]; then
+    echo "Finalizing self-update..."
+    mv "$0" "$EZ_CORE"
+    chmod +x "$EZ_CORE"
+    echo "Self-update complete ✅"
+    exit 0
+fi
+
+# -------------------------------
 # CLI Arguments
 # -------------------------------
 MODULE="$1"
 ACTION="$2"
 
 if [[ -z "$MODULE" ]]; then
-    echo "Ez Installer (eze0.2.0)"
-    echo "Available installs:"
+    echo "Ez Installer (eze0.2.1)"
+    echo "Available modules:"
     for m in "${!MODULE_URLS[@]}"; do
         echo "  - $m"
     done
     echo ""
-    echo "Usage: eze <EzCore|Keys|Musical|Audio> [update|remove]"
+    echo "Usage: eze <EzCore|Keys|Musical|Audio> [update|remove|selfupdate]"
     exit 0
 fi
 
 # -------------------------------
-# Self-update Ez
+# Self-update
 # -------------------------------
-if [[ "$MODULE" == "update_eze" ]]; then
-    echo "Updating Ez installer script..."
-    slow_download "${MODULE_URLS["EzCore"]}" "$EZ_CORE"
-    chmod +x "$EZ_CORE"
-    echo "eze updated successfully! ✅"
+if [[ "$MODULE" == "selfupdate" ]]; then
+    echo "Starting Ez self-update..."
+    tmpfile="$EZ_HOME/eze1"
+    slow_download "${MODULE_URLS["EzCore"]}" "$tmpfile"
+    chmod +x "$tmpfile"
+    echo "Launching eze1 to finalize update..."
+    "$tmpfile" &
     exit 0
 fi
 
