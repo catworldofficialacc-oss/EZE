@@ -1,7 +1,7 @@
 #!/bin/bash
-# eze0.2.1 — Ez installer/updater with reliable self-update
+# eze0.2.2 — Ez installer/updater with visual self-update
 # Supports: EzCore, Keys, Musical, Audio
-# Downloads with slow line-by-line effect
+# Downloads slowly line by line for visual effect
 
 # -------------------------------
 # Paths
@@ -42,7 +42,12 @@ slow_download() {
     echo "Downloading $dest..."
     while IFS= read -r line; do
         echo "$line" >> "$dest"
-        sleep 0.03
+        # Print slowly for visual effect
+        for (( i=0; i<${#line}; i++ )); do
+            printf "%c" "${line:$i:1}"
+            sleep 0.005
+        done
+        echo ""
     done < "$temp"
 
     rm "$temp"
@@ -56,7 +61,7 @@ if [[ "$(basename "$0")" == "eze1" ]]; then
     echo "Finalizing self-update..."
     mv "$0" "$EZ_CORE"
     chmod +x "$EZ_CORE"
-    echo "Self-update complete ✅"
+    echo "Ez installer updated successfully! ✅"
     exit 0
 fi
 
@@ -67,7 +72,7 @@ MODULE="$1"
 ACTION="$2"
 
 if [[ -z "$MODULE" ]]; then
-    echo "Ez Installer (eze0.2.1)"
+    echo "Ez Installer (eze0.2.2)"
     echo "Available modules:"
     for m in "${!MODULE_URLS[@]}"; do
         echo "  - $m"
