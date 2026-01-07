@@ -1,11 +1,12 @@
 #!/bin/bash
 # Ez Installer: eze0.1.0
+# Fully rewritten, polished version
 # Features:
 #   - Install/update/remove modules
-#   - Self-update from EZE repo
-#   - Slow, line-by-line download for visual feedback
+#   - Safe self-update with slow download
+#   - Module-aware: installs only requested modules
 #   - Friendly terminal messages
-#   - No default install: must specify module
+#   - No default installs
 
 # -------------------------------
 # Paths
@@ -20,7 +21,8 @@ mkdir -p "$MODULES_DIR"
 # Map modules to download URLs
 # -------------------------------
 declare -A MODULE_URLS
-MODULE_URLS["Keys"]="https://raw.githubusercontent.com/catworldofficialacc-oss/EZK/main/Keys0.2.0"
+MODULE_URLS["Keys"]="https://raw.githubusercontent.com/catworldofficialacc-oss/EZK/refs/heads/main/Keys0.2.0
+"
 # You can add more modules later:
 # MODULE_URLS["OtherModule"]="https://raw.githubusercontent.com/user/OtherRepo/main/OtherModuleFile"
 
@@ -37,8 +39,8 @@ function slow_download() {
     local url="$1"
     local dest="$2"
 
-    # Download temp file first
     temp_file=$(mktemp)
+    # Download silently
     if command -v curl &>/dev/null; then
         curl -s -o "$temp_file" "$url"
     elif command -v wget &>/dev/null; then
@@ -48,13 +50,13 @@ function slow_download() {
         exit 1
     fi
 
-    # Process each line slowly
+    # Slow line-by-line write
     mkdir -p "$(dirname "$dest")"
-    > "$dest"  # empty destination file
+    > "$dest"
     echo "Downloading $dest..."
     while IFS= read -r line; do
         echo "$line" >> "$dest"
-        sleep 0.05  # adjust speed here
+        sleep 0.03
     done < "$temp_file"
 
     rm "$temp_file"
@@ -66,10 +68,41 @@ function slow_download() {
 # -------------------------------
 if [[ "$MODULE" == "update_eze" ]]; then
     echo "Updating eze script..."
-    EZE_RAW_URL="https://raw.githubusercontent.com/catworldofficialacc-oss/EZE/main/eze"
-    slow_download "$EZE_RAW_URL" "$EZE_PATH"
-    chmod +x "$EZE_PATH"
-    echo "eze updated successfully ✅"
+
+    EZE_RAW_URL="https://raw.githubusercontent.com/catworldofficialacc-oss/EZE/refs/heads/main/eze0.1.0"
+
+    temp_file=$(mktemp)
+
+    if command -v curl &>/dev/null; then
+        curl -s -o "$temp_file" "$EZE_RAW_URL"
+    elif command -v wget &>/dev/null; then
+        wget -q -O "$temp_file" "$EZE_RAW_URL"
+    else
+        echo "Error: curl or wget not installed"
+        exit 1
+    fi
+
+    # Slow line-by-line
+    temp_file_slow="${temp_file}.slow"
+    > "$temp_file_slow"
+    echo "Downloading eze line by line..."
+    while IFS= read -r line; do
+        echo "$line" >> "$temp_file_slow"
+        sleep 0.03
+    done < "$temp_file"
+
+    # Replace safely
+    if [[ -w "$EZE_PATH" ]]; then
+        mv "$temp_file_slow" "$EZE_PATH"
+        chmod +x "$EZE_PATH"
+        rm -f "$temp_file"
+        echo "eze updated successfully ✅"
+    else
+        echo "Error: cannot overwrite $EZE_PATH. Check permissions."
+        rm -f "$temp_file" "$temp_file_slow"
+        exit 1
+    fi
+
     exit 0
 fi
 
