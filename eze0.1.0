@@ -1,162 +1,116 @@
 #!/bin/bash
-# Ez Installer: eze0.1.0
-# Fully rewritten, polished version
-# Features:
-#   - Install/update/remove modules
-#   - Safe self-update with slow download
-#   - Module-aware: installs only requested modules
-#   - Friendly terminal messages
-#   - No default installs
+# eze0.2.0 — Ez installer/updater
+# Supports: Ez core + Keys + Musical + Audio
+# Downloads with slow line-by-line effect
 
 # -------------------------------
 # Paths
 # -------------------------------
-EZ_ROOT="$HOME/ez_runtime"
-MODULES_DIR="$EZ_ROOT/modules"
-EZE_PATH="$EZ_ROOT/eze"
-
+EZ_HOME="$HOME/ez_runtime"
+MODULES_DIR="$EZ_HOME/modules"
+EZ_CORE="$EZ_HOME/ez"
 mkdir -p "$MODULES_DIR"
 
 # -------------------------------
-# Map modules to download URLs
+# Map modules to raw GitHub URLs
 # -------------------------------
 declare -A MODULE_URLS
-MODULE_URLS["Keys"]="https://raw.githubusercontent.com/catworldofficialacc-oss/EZK/refs/heads/main/Keys0.2.0
-"
-# You can add more modules later:
-# MODULE_URLS["OtherModule"]="https://raw.githubusercontent.com/user/OtherRepo/main/OtherModuleFile"
+MODULE_URLS["EzCore"]="https://raw.githubusercontent.com/catworldofficialacc-oss/EzCode/refs/heads/main/Ez"
+MODULE_URLS["Keys"]="https://raw.githubusercontent.com/catworldofficialacc-oss/EZK/refs/heads/main/Keys0.2.0"
+MODULE_URLS["Musical"]="https://raw.githubusercontent.com/catworldofficialacc-oss/EZM/refs/heads/main/Musical"
+MODULE_URLS["Audio"]="https://raw.githubusercontent.com/catworldofficialacc-oss/EZA/refs/heads/main/Audio"
 
 # -------------------------------
-# Arguments
+# Slow line-by-line downloader
 # -------------------------------
-MODULE="$1"
-ACTION="$2"
-
-# -------------------------------
-# Slow download function
-# -------------------------------
-function slow_download() {
+slow_download() {
     local url="$1"
     local dest="$2"
 
-    temp_file=$(mktemp)
-    # Download silently
-    if command -v curl &>/dev/null; then
-        curl -s -o "$temp_file" "$url"
-    elif command -v wget &>/dev/null; then
-        wget -q -O "$temp_file" "$url"
+    temp=$(mktemp)
+    if command -v curl &> /dev/null; then
+        curl -s -o "$temp" "$url"
+    elif command -v wget &> /dev/null; then
+        wget -q -O "$temp" "$url"
     else
         echo "Error: curl or wget not installed"
         exit 1
     fi
 
-    # Slow line-by-line write
     mkdir -p "$(dirname "$dest")"
     > "$dest"
     echo "Downloading $dest..."
     while IFS= read -r line; do
         echo "$line" >> "$dest"
         sleep 0.03
-    done < "$temp_file"
+    done < "$temp"
 
-    rm "$temp_file"
+    rm "$temp"
     echo "Download complete ✅"
 }
 
 # -------------------------------
-# Self-update logic
+# CLI Arguments
 # -------------------------------
-if [[ "$MODULE" == "update_eze" ]]; then
-    echo "Updating eze script..."
+MODULE="$1"
+ACTION="$2"
 
-    EZE_RAW_URL="https://raw.githubusercontent.com/catworldofficialacc-oss/EZE/refs/heads/main/eze0.1.0"
-
-    temp_file=$(mktemp)
-
-    if command -v curl &>/dev/null; then
-        curl -s -o "$temp_file" "$EZE_RAW_URL"
-    elif command -v wget &>/dev/null; then
-        wget -q -O "$temp_file" "$EZE_RAW_URL"
-    else
-        echo "Error: curl or wget not installed"
-        exit 1
-    fi
-
-    # Slow line-by-line
-    temp_file_slow="${temp_file}.slow"
-    > "$temp_file_slow"
-    echo "Downloading eze line by line..."
-    while IFS= read -r line; do
-        echo "$line" >> "$temp_file_slow"
-        sleep 0.03
-    done < "$temp_file"
-
-    # Replace safely
-    if [[ -w "$EZE_PATH" ]]; then
-        mv "$temp_file_slow" "$EZE_PATH"
-        chmod +x "$EZE_PATH"
-        rm -f "$temp_file"
-        echo "eze updated successfully ✅"
-    else
-        echo "Error: cannot overwrite $EZE_PATH. Check permissions."
-        rm -f "$temp_file" "$temp_file_slow"
-        exit 1
-    fi
-
-    exit 0
-fi
-
-# -------------------------------
-# Show usage / list modules if no module specified
-# -------------------------------
 if [[ -z "$MODULE" ]]; then
-    echo "Ez Installer (eze0.1.0)"
-    echo "Available modules to install:"
-    for mod in "${!MODULE_URLS[@]}"; do
-        echo "  - $mod"
+    echo "Ez Installer (eze0.2.0)"
+    echo "Available installs:"
+    for m in "${!MODULE_URLS[@]}"; do
+        echo "  - $m"
     done
     echo ""
-    echo "Usage: eze <ModuleName> [update|remove]"
-    echo "       eze update_eze   # self-update eze"
+    echo "Usage: eze <EzCore|Keys|Musical|Audio> [update|remove]"
     exit 0
 fi
 
 # -------------------------------
-# Check if module exists
+# Self-update Ez
 # -------------------------------
-GITHUB_RAW="${MODULE_URLS[$MODULE]}"
-if [[ -z "$GITHUB_RAW" ]]; then
-    echo "Error: Unknown module '$MODULE'. Available modules: ${!MODULE_URLS[@]}"
+if [[ "$MODULE" == "update_eze" ]]; then
+    echo "Updating Ez installer script..."
+    slow_download "${MODULE_URLS["EzCore"]}" "$EZ_CORE"
+    chmod +x "$EZ_CORE"
+    echo "eze updated successfully! ✅"
+    exit 0
+fi
+
+# -------------------------------
+# Check module exists
+# -------------------------------
+RAW_URL="${MODULE_URLS[$MODULE]}"
+if [[ -z "$RAW_URL" ]]; then
+    echo "Unknown module: $MODULE"
+    echo "Available: ${!MODULE_URLS[@]}"
     exit 1
 fi
 
-# -------------------------------
-# Module folder
-# -------------------------------
 module_path="$MODULES_DIR/$MODULE"
 
 # -------------------------------
-# Handle remove
+# Remove
 # -------------------------------
 if [[ "$ACTION" == "remove" ]]; then
-    if [[ ! -d "$module_path" ]]; then
+    if [[ -d "$module_path" ]]; then
+        rm -rf "$module_path"
+        echo "Module '$MODULE' removed ❌"
+    else
         echo "Module '$MODULE' is not installed."
-        exit 1
     fi
-    rm -rf "$module_path"
-    echo "Module '$MODULE' removed successfully ❌"
     exit 0
 fi
 
 # -------------------------------
-# Handle update
+# Update
 # -------------------------------
 if [[ "$ACTION" == "update" ]]; then
     if [[ ! -d "$module_path" ]]; then
-        echo "Module '$MODULE' is not installed. Run 'eze $MODULE' to install it first."
+        echo "Not installed. Run 'eze $MODULE' first."
         exit 1
     fi
-    rm -f "$module_path"/*
+    rm -rf "$module_path"/*
     mkdir -p "$module_path"
 fi
 
@@ -165,13 +119,15 @@ fi
 # -------------------------------
 if [[ "$ACTION" != "update" ]]; then
     if [[ -d "$module_path" && "$ACTION" != "" ]]; then
-        echo "Module '$MODULE' is already installed. Use 'eze $MODULE update' to refresh."
+        echo "Already installed. Use 'eze $MODULE update'."
         exit 0
     fi
     mkdir -p "$module_path"
 fi
 
 # -------------------------------
-# Download module
+# Do the download
 # -------------------------------
-slow_download "$GITHUB_RAW" "$module_path/$MODULE"
+slow_download "$RAW_URL" "$module_path/$MODULE"
+chmod +x "$module_path/$MODULE"
+echo "Module '$MODULE' installed/updated successfully ✅"
