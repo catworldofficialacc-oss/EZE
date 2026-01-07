@@ -1,67 +1,121 @@
 #!/bin/bash
-# Ez Keys Installer: eze
-# Usage:
-# eze <ModuleName> [update|remove]
+# Ez Keys Installer: eze0.1.0
+# Features:
+#   - Install/update/remove modules (currently Keys)
+#   - Self-update from EZE repo
+#   - Slow, line-by-line download for visual feedback
+#   - Friendly terminal messages
 
+# -------------------------------
+# Paths
+# -------------------------------
 EZ_ROOT="$HOME/ez_runtime"
 MODULES_DIR="$EZ_ROOT/modules"
+EZE_PATH="$EZ_ROOT/eze"
+
 mkdir -p "$MODULES_DIR"
 
+# -------------------------------
+# Arguments
+# -------------------------------
 MODULE="$1"
 ACTION="$2"
 
+# -------------------------------
+# Slow download function
+# -------------------------------
+function slow_download() {
+    local url="$1"
+    local dest="$2"
+
+    # Download temp file first
+    temp_file=$(mktemp)
+    if command -v curl &>/dev/null; then
+        curl -s -o "$temp_file" "$url"
+    elif command -v wget &>/dev/null; then
+        wget -q -O "$temp_file" "$url"
+    else
+        echo "Error: curl or wget not installed"
+        exit 1
+    fi
+
+    # Process each line slowly
+    mkdir -p "$(dirname "$dest")"
+    > "$dest"  # empty destination file
+    echo "Downloading $dest..."
+    while IFS= read -r line; do
+        echo "$line" >> "$dest"
+        sleep 0.05  # adjust speed here (0.05 sec per line)
+    done < "$temp_file"
+
+    rm "$temp_file"
+    echo "Download complete ✅"
+}
+
+# -------------------------------
+# Self-update logic
+# -------------------------------
+if [[ "$MODULE" == "update_eze" ]]; then
+    echo "Updating eze script..."
+    EZE_RAW_URL="https://raw.githubusercontent.com/catworldofficialacc-oss/EZE/main/eze"
+    slow_download "$EZE_RAW_URL" "$EZE_PATH"
+    chmod +x "$EZE_PATH"
+    echo "eze updated successfully ✅"
+    exit 0
+fi
+
+# -------------------------------
+# Show usage if no module
+# -------------------------------
 if [[ -z "$MODULE" ]]; then
     echo "Usage: eze <ModuleName> [update|remove]"
+    echo "       eze update_eze   # self-update eze"
     exit 1
 fi
 
+# -------------------------------
+# Module folder
+# -------------------------------
 module_path="$MODULES_DIR/$MODULE"
-
-# Default GitHub raw URL (currently only Keys)
 GITHUB_RAW="https://raw.githubusercontent.com/catworldofficialacc-oss/EZK/main/Keys0.2.0"
 
-case "$ACTION" in
-    update)
-        if [[ ! -d "$module_path" ]]; then
-            echo "Module '$MODULE' is not installed. Run 'eze $MODULE' to install it first."
-            exit 1
-        fi
-        rm -f "$module_path"/*
-        mkdir -p "$module_path"
-        ;;
-    remove)
-        if [[ ! -d "$module_path" ]]; then
-            echo "Module '$MODULE' is not installed."
-            exit 1
-        fi
-        rm -rf "$module_path"
-        echo "Module '$MODULE' removed successfully ❌"
-        exit 0
-        ;;
-    "")
-        # default action is install
-        if [[ -d "$module_path" ]]; then
-            echo "Module '$MODULE' is already installed. Use 'eze $MODULE update' to refresh."
-            exit 0
-        fi
-        mkdir -p "$module_path"
-        ;;
-    *)
-        echo "Unknown action: $ACTION"
-        echo "Usage: eze <ModuleName> [update|remove]"
+# -------------------------------
+# Handle remove
+# -------------------------------
+if [[ "$ACTION" == "remove" ]]; then
+    if [[ ! -d "$module_path" ]]; then
+        echo "Module '$MODULE' is not installed."
         exit 1
-        ;;
-esac
-
-# Download module (currently only Keys)
-if command -v curl &>/dev/null; then
-    curl -s -o "$module_path/Keys0.2.0" "$GITHUB_RAW"
-elif command -v wget &>/dev/null; then
-    wget -q -O "$module_path/Keys0.2.0" "$GITHUB_RAW"
-else
-    echo "Error: curl or wget not installed"
-    exit 1
+    fi
+    rm -rf "$module_path"
+    echo "Module '$MODULE' removed successfully ❌"
+    exit 0
 fi
 
-echo "Module '$MODULE' installed/updated successfully ✅"
-#
+# -------------------------------
+# Handle update
+# -------------------------------
+if [[ "$ACTION" == "update" ]]; then
+    if [[ ! -d "$module_path" ]]; then
+        echo "Module '$MODULE' is not installed. Run 'eze $MODULE' to install it first."
+        exit 1
+    fi
+    rm -f "$module_path"/*
+    mkdir -p "$module_path"
+fi
+
+# -------------------------------
+# Default: install
+# -------------------------------
+if [[ "$ACTION" != "update" ]]; then
+    if [[ -d "$module_path" && "$ACTION" != "" ]]; then
+        echo "Module '$MODULE' is already installed. Use 'eze $MODULE update' to refresh."
+        exit 0
+    fi
+    mkdir -p "$module_path"
+fi
+
+# -------------------------------
+# Download module
+# -------------------------------
+slow_download "$GITHUB_RAW" "$module_path/Keys0.2.0"
